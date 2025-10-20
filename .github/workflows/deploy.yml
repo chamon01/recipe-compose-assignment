@@ -1,0 +1,54 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # Backend tests
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm install
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: npm test
+
+      # Frontend tests
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm install
+
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: npm test
+
+      # Deploy (only if tests pass)
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy Backend
+        run: gcloud builds submit --config cloudbuild-backend.yaml .
+
+      - name: Deploy Frontend
+        run: gcloud builds submit --config cloudbuild-frontend.yaml .
