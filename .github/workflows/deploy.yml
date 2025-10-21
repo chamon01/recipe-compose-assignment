@@ -10,15 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the repo
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      # Backend tests
+      # Backend install + test
       - name: Install backend dependencies
         working-directory: ./backend
         run: npm install
@@ -27,7 +29,7 @@ jobs:
         working-directory: ./backend
         run: npm test
 
-      # Frontend tests
+      # Frontend install + test
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm install
@@ -36,19 +38,37 @@ jobs:
         working-directory: ./frontend
         run: npm test
 
-      # Deploy (only if tests pass)
+      # Authenticate to Google Cloud
       - name: Authenticate with Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # Set up gcloud
       - name: Set up gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
+          install_components: 'beta'
 
+      # Deploy Backend to Cloud Run
       - name: Deploy Backend
-        run: gcloud builds submit --config cloudbuild-backend.yaml .
+        run: |
+          gcloud builds submit --config cloudbuild-backend.yaml .
+          gcloud run deploy recipe-backend \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/recipe-backend \
+            --region us-central1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account github-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
+      # Deploy Frontend to Cloud Run
       - name: Deploy Frontend
-        run: gcloud builds submit --config cloudbuild-frontend.yaml .
+        run: |
+          gcloud builds submit --config cloudbuild-frontend.yaml .
+          gcloud run deploy recipe-frontend \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/recipe-frontend \
+            --region us-central1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account github-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
